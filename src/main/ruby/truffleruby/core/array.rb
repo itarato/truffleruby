@@ -184,12 +184,16 @@ class Array
     return self[start, diff] if step == 1 # step == 1 is a simple slice
 
     # optimize when no step will be done and only start element is returned
-    return self[start, 1] if (step > 0 && step > diff) || (step < 0 && step < -diff)
+    puts("start=#{start} stop=#{stop} step=#{step} diff=#{diff}")
+    return self[start, 1] if (step > 0 && step > diff)
+    return self[stop, 1] if (step < 0 && step < -diff)
 
     ustep = step.abs
     nlen = (diff + ustep - 1) / ustep
     i = 0
     j = start + (step > 0 ? 0 : diff - 1) # because we inverted negative step ranges
+    j += 1 if seq.exclude_end? && step < 0
+
     res = Array.new(nlen)
 
     while i < nlen
