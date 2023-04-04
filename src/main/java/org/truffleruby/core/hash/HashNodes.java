@@ -513,7 +513,7 @@ public abstract class HashNodes {
         @Specialization(guards = "hash.empty()")
         protected Object shiftEmpty(RubyHash hash,
                 @Cached DispatchNode callDefault) {
-            return callDefault.call(hash, "default", nil);
+            return nil;
         }
 
         @Specialization(guards = "!hash.empty()", limit = "hashStrategyLimit()")
