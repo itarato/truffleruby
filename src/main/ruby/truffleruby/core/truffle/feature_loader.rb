@@ -165,16 +165,16 @@ module Truffle
               loaded_feature = $LOADED_FEATURES[fe.index]
 
               next if loaded_feature.size < feature.size
-              feature_path = if loaded_feature.start_with?(feature)
-                               feature
+              found_feature_path = if loaded_feature.start_with?(feature)
+                               true
                              else
                                if expanded
-                                 nil
+                                 false
                                else
-                                 loaded_feature_path(loaded_feature, feature, get_expanded_load_path)
+                                 feature_path_loaded?(loaded_feature, feature, get_expanded_load_path)
                                end
                              end
-              if feature_path
+              if found_feature_path
                 loaded_feature_ext = extension_symbol(loaded_feature)
                 if !loaded_feature_ext
                   return :unknown unless feature_ext
@@ -198,11 +198,18 @@ module Truffle
     # MRI: loaded_feature_path
     # Search if $LOAD_PATH[i]/feature corresponds to loaded_feature.
     # Returns the $LOAD_PATH entry containing feature.
-    def self.loaded_feature_path(loaded_feature, feature, load_path)
+    def self.feature_path_loaded?(loaded_feature, feature, load_path)
       name_ext = extension(loaded_feature)
-      load_path.find do |p|
-        loaded_feature == "#{p}/#{feature}#{name_ext}" || loaded_feature == "#{p}/#{feature}"
-      end
+
+      path = if loaded_feature.end_with?("/#{feature}#{name_ext}")
+               loaded_feature.chomp("/#{feature}#{name_ext}")
+             elsif loaded_feature.end_with?("/#{feature}")
+               loaded_feature.chomp("/#{feature}")
+             else
+               return false
+             end
+
+      load_path.include?(path)
     end
 
     # MRI: rb_provide_feature
