@@ -72,6 +72,14 @@ module Truffle
           feature_no_ext.end_with?(lookup.feature_no_ext)
         end
       end
+
+      def extension_type
+        case @ext
+        when '.rb' then :rb
+        when '.so', '.dlext' then :so
+        else :unknown
+        end
+      end
     end
 
     # Looks up the feature in all LOAD_PATH folders with all possible extensions.
@@ -174,9 +182,6 @@ module Truffle
     # Returns the extension IF it's already loaded in LOADED_FEATURES - but only if it's binary or .rb
     # Essentially - this looks up if the feature is already loaded (in LOADED_FEATURES) - and returns the type (rb/bin).
     def self.feature_provided?(feature)
-      feature_ext = extension_symbol(feature)
-      feature_has_rb_ext = feature_ext == :rb
-
       with_synchronized_features do
         update_loaded_features_index # It says `get` but it mutates (refreshes) the instance cache var
         feature_entry = FeatureEntry.new(feature)
@@ -198,20 +203,8 @@ module Truffle
                                      end
                                    end
               # Extension check - to allow only Ruby or binary files.
-              if found_feature_path
-                loaded_feature_ext = extension_symbol(loaded_feature)
-                if !loaded_feature_ext
-                  return :unknown unless feature_ext
-                else
-                  # This looks complicated.
-                  if (!feature_has_rb_ext || !feature_ext) && binary_ext?(loaded_feature_ext)
-                    return :so
-                  end
-                  if (feature_has_rb_ext || !feature_ext) && loaded_feature_ext == :rb
-                    return :rb
-                  end
-                end
-              end
+              # This looks complicated.
+              return fe.extension_type if found_feature_path
             end
           end
         end
@@ -263,10 +256,6 @@ module Truffle
       else
         nil
       end
-    end
-
-    def self.binary_ext?(ext)
-      ext == :so || ext == :dlext
     end
 
     # Done this way to avoid many duplicate Strings representing the file extensions
