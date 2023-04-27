@@ -49,6 +49,7 @@ module Truffle
       @working_directory_copy = nil
     end
 
+    # Breaks down a feature "path" to know the extension, base, filename, etc
     class FeatureEntry
       attr_accessor :index
       attr_reader :feature, :ext, :feature_no_ext, :base
@@ -62,6 +63,9 @@ module Truffle
       end
 
       def include?(lookup)
+        # Is this even correct? What if this new `lookup` has an ext but the registered one does not?
+        # Likely that $LOADED_FEATURES always use the extensioned version - hence it always have extension.
+        # However: `end_with?` is inaccurate, eg: "/path/active_record.rb".end_with?("ord.rb")
         if lookup.ext
           feature.end_with?(lookup.feature)
         else
@@ -70,25 +74,35 @@ module Truffle
       end
     end
 
+    # Looks up the feature in all LOAD_PATH folders with all possible extensions.
+    # Seems expensive.
     def self.find_file(feature)
       feature = File.expand_path(feature) if feature.start_with?('~')
       Primitive.find_file(feature)
     end
 
     # MRI: search_required
+    # Returns:
+    # [
+    #   <STATE>, # (not found, found, loaded)
+    #   <PATH>,
+    #   <EXTENSION>,
+    # ]
     def self.find_feature_or_file(feature, use_feature_provided = true)
+      # Get the extension (if there is)
       feature_ext = extension_symbol(feature)
+
       if feature_ext
         case feature_ext
         when :rb
-          if use_feature_provided && feature_provided?(feature, false)
+          if use_feature_provided && feature_provided?(feature)
             return [:feature_loaded, nil, :rb]
           end
           path = find_file(feature)
           return expanded_path_provided(path, :rb, use_feature_provided) if path
           return [:not_found, nil, nil]
         when :so
-          if use_feature_provided && feature_provided?(feature, false)
+          if use_feature_provided && feature_provided?(feature)
             return [:feature_loaded, nil, :so]
           else
             feature_no_ext = feature[0...-3] # remove ".so"
@@ -96,7 +110,7 @@ module Truffle
             return expanded_path_provided(path, :so, use_feature_provided) if path
           end
         when :dlext
-          if use_feature_provided && feature_provided?(feature, false)
+          if use_feature_provided && feature_provided?(feature)
             return [:feature_loaded, nil, :so]
           else
             path = find_file(feature)
@@ -104,7 +118,7 @@ module Truffle
           end
         end
       else
-        found = use_feature_provided && feature_provided?(feature, false)
+        found = use_feature_provided && feature_provided?(feature)
         if found == :rb
           return [:feature_loaded, nil, :rb]
         else
@@ -112,13 +126,14 @@ module Truffle
         end
       end
 
+      # path = the complete absolute file path.
       path = find_file(feature)
       if path
         ext_normalized = extension_symbol(path) == :rb ? :rb : :so
         if found && ext_normalized != :rb
           [:feature_loaded, nil, found]
         else
-          found_expanded = use_feature_provided && feature_provided?(path, true)
+          found_expanded = use_feature_provided && feature_provided?(path)
           if found_expanded
             [:feature_loaded, nil, ext_normalized]
           else
@@ -129,7 +144,8 @@ module Truffle
         if found
           [:feature_loaded, nil, found]
         else
-          found = use_feature_provided && feature_provided?(feature, true)
+          # NOTE: `expanded` can be true even when it's not
+          found = use_feature_provided && feature_provided?(feature)
           if found
             found = :so if found == :unknown
             [:feature_loaded, nil, found]
@@ -141,7 +157,7 @@ module Truffle
     end
 
     def self.expanded_path_provided(path, ext, use_feature_provided)
-      if use_feature_provided && feature_provided?(path, true)
+      if use_feature_provided && feature_provided?(path)
         [:feature_loaded, path, ext]
       else
         [:feature_found, path, ext]
@@ -152,33 +168,42 @@ module Truffle
     # Whether feature is already loaded, i.e., part of $LOADED_FEATURES,
     # using the @loaded_features_index to lookup faster.
     # expanded is true if feature is an expanded path (and exists).
-    def self.feature_provided?(feature, expanded)
+    #
+    # Maybe -> def self.feature_loaded? if it's about being loaded.
+    # Find out what this is doing!
+    # Returns the extension IF it's already loaded in LOADED_FEATURES - but only if it's binary or .rb
+    # Essentially - this looks up if the feature is already loaded (in LOADED_FEATURES) - and returns the type (rb/bin).
+    def self.feature_provided?(feature)
       feature_ext = extension_symbol(feature)
       feature_has_rb_ext = feature_ext == :rb
 
       with_synchronized_features do
-        get_loaded_features_index
+        update_loaded_features_index # It says `get` but it mutates (refreshes) the instance cache var
         feature_entry = FeatureEntry.new(feature)
         if @loaded_features_index.key?(feature_entry.base)
           @loaded_features_index[feature_entry.base].each do |fe|
             if fe.include?(feature_entry)
               loaded_feature = $LOADED_FEATURES[fe.index]
 
-              next if loaded_feature.size < feature.size
+              next if loaded_feature.size < feature.size # This is a super slim-chance guard.
+              # Check if the iterator's `loaded_feature` is matching
               found_feature_path = if loaded_feature.start_with?(feature)
                                      true
                                    else
-                                     if expanded
+                                     # NOTE: expanded can be true even when it's not
+                                     if feature.getbyte(0) == 47 # '/'
                                        false
                                      else
                                        feature_path_loaded?(loaded_feature, feature, get_expanded_load_path)
                                      end
                                    end
+              # Extension check - to allow only Ruby or binary files.
               if found_feature_path
                 loaded_feature_ext = extension_symbol(loaded_feature)
                 if !loaded_feature_ext
                   return :unknown unless feature_ext
                 else
+                  # This looks complicated.
                   if (!feature_has_rb_ext || !feature_ext) && binary_ext?(loaded_feature_ext)
                     return :so
                   end
@@ -198,6 +223,7 @@ module Truffle
     # MRI: loaded_feature_path
     # Search if $LOAD_PATH[i]/feature corresponds to loaded_feature.
     # Returns the $LOAD_PATH entry containing feature.
+    # Question: why would we care about LOAD_PATH lookup? Isn't the `loaded_feature` match an enough guarantee?
     def self.feature_path_loaded?(loaded_feature, feature, load_path)
       name_ext = extension(loaded_feature)
 
@@ -218,7 +244,8 @@ module Truffle
       raise '$LOADED_FEATURES is frozen; cannot append feature' if $LOADED_FEATURES.frozen?
       #feature.freeze # TODO freeze these but post-boot.rb issue using replace
       with_synchronized_features do
-        get_loaded_features_index
+        # This separation to avoid unnecessary full updates
+        update_loaded_features_index
         $LOADED_FEATURES << feature
         features_index_add(feature, $LOADED_FEATURES.size - 1)
         @loaded_features_version = $LOADED_FEATURES.version
@@ -284,23 +311,25 @@ module Truffle
       end
     end
 
-    # MRI: get_loaded_features_index
+    # MRI: update_loaded_features_index
     # always called inside #with_synchronized_features
-    def self.get_loaded_features_index
+    #
+    # Returns a Hash[feature, FeatureEntry] - updates when $LOADED_FEATURES has been updated
+    def self.update_loaded_features_index
       unless @loaded_features_version == $LOADED_FEATURES.version
         raise '$LOADED_FEATURES is frozen; cannot append feature' if $LOADED_FEATURES.frozen?
         @loaded_features_index.clear
-        $LOADED_FEATURES.map! do |val|
+        # This could be optimized to 1 loop.
+        $LOADED_FEATURES.map!.with_index do |val, idx|
           val = StringValue(val)
           #val.freeze # TODO freeze these but post-boot.rb issue using replace
-          val
-        end
-        $LOADED_FEATURES.each_with_index do |val, idx|
+
           features_index_add(val, idx)
+
+          val
         end
         @loaded_features_version = $LOADED_FEATURES.version
       end
-      @loaded_features_index
     end
 
     # MRI: features_index_add
