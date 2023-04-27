@@ -41,12 +41,17 @@ module Truffle
     # nil if there is no relative path in $LOAD_PATH, a copy of the cwd to check if the cwd changed otherwise.
     @working_directory_copy = nil
 
+    @feature_provided_cache = {}
+    @feature_provided_cache_load_path_version = nil
+    @feature_provided_cache_loaded_features_version = nil
+
     def self.clear_cache
       @loaded_features_index.clear
       @loaded_features_version = -1
       @expanded_load_path.clear
       @load_path_version = -1
       @working_directory_copy = nil
+      @feature_provided_cache.clear
     end
 
     # Breaks down a feature "path" to know the extension, base, filename, etc
@@ -183,10 +188,22 @@ module Truffle
     # Essentially - this looks up if the feature is already loaded (in LOADED_FEATURES) - and returns the type (rb/bin).
     def self.feature_provided?(feature)
       with_synchronized_features do
+        if (
+          @feature_provided_cache_load_path_version != $LOAD_PATH.version ||
+          @feature_provided_cache_loaded_features_version != $LOADED_FEATURES.version
+        )
+          @feature_provided_cache.clear
+          @feature_provided_cache_load_path_version = $LOAD_PATH.version
+          @feature_provided_cache_loaded_features_version = $LOADED_FEATURES.version
+        end
+
+        return @feature_provided_cache[feature] if @feature_provided_cache.key?(feature)
+
         update_loaded_features_index # It says `get` but it mutates (refreshes) the instance cache var
         feature_entry = FeatureEntry.new(feature)
         if @loaded_features_index.key?(feature_entry.base)
           @loaded_features_index[feature_entry.base].each do |fe|
+            # Checking is this `feature_entry` is the same as `fe`.
             if fe.include?(feature_entry)
               loaded_feature = $LOADED_FEATURES[fe.index]
 
@@ -204,11 +221,14 @@ module Truffle
                                    end
               # Extension check - to allow only Ruby or binary files.
               # This looks complicated.
-              return fe.extension_type if found_feature_path
+              if found_feature_path
+                return @feature_provided_cache[feature] = fe.extension_type
+              end
             end
           end
         end
 
+        @feature_provided_cache[feature] = false
         false
       end
     end
