@@ -63,7 +63,7 @@ module Truffle
         @ext = Truffle::FeatureLoader.extension(feature)
         @feature = feature
         @feature_no_ext = @ext ? feature[0...(-@ext.size)] : feature
-        # Risking a simpler lookup. Assuming we always have ascii strings here. Can we do that?
+        # Risking a simpler lookup. Assuming we always have ascii strings here. Can we do that? Seems so: Kernel-require already does Type.coerce_to_path.
         @base = if (slash_pos = Primitive.find_string_reverse(@feature_no_ext, '/', @feature_no_ext.bytesize))
                   @feature_no_ext[slash_pos + 1..]
                 else
