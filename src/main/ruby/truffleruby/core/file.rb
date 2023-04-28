@@ -174,10 +174,11 @@ class File < IO
       if pos == path.bytesize - 1
 
         # Find the first non-/ from the right
-        data = path.bytes
+        # Note: this is allocating the full size, you could optimize this
+        # Also: Primitive.find_string_reverse_not(path, slash, path.bytesize)
         found = false
         pos.downto(0) do |i|
-          if data[i] != 47  # ?/
+          if path.getbyte(i) != 47  # ?/
             path = path.byteslice(0, i+1)
             found = true
             break
