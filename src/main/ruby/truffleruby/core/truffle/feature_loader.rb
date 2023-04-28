@@ -135,6 +135,7 @@ module Truffle
         if found == :rb
           return [:feature_loaded, nil, :rb]
         else
+          # What?
           found = :so if found == :unknown
         end
       end

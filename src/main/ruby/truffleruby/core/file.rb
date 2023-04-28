@@ -162,7 +162,8 @@ class File < IO
   #  File.basename("/home/gumby/work/ruby.rb")          #=> "ruby.rb"
   #  File.basename("/home/gumby/work/ruby.rb", ".rb")   #=> "ruby"
   def self.basename(path, ext = undefined)
-    path = Truffle::Type.coerce_to_path(path)
+    # Skip null byte check - thats fine probably.
+    path = Truffle::Type.coerce_to_path(path, false)
 
     slash = '/'
 
