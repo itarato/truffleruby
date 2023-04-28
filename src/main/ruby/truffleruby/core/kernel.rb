@@ -224,6 +224,7 @@ module Kernel
   # Take this alias name so RubyGems will reuse this method
   # and skip the method below once RubyGems is loaded.
   private def gem_original_require(feature)
+    # This is also called in File.basename
     feature = Truffle::Type.coerce_to_path(feature)
 
     status, path = Truffle::FeatureLoader.find_feature_or_file(feature)

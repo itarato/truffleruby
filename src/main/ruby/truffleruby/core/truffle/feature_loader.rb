@@ -63,7 +63,7 @@ module Truffle
         @ext = Truffle::FeatureLoader.extension(feature)
         @feature = feature
         @feature_no_ext = @ext ? feature[0...(-@ext.size)] : feature
-        # Risking a simpler lookup.
+        # Risking a simpler lookup. Assuming we always have ascii strings here. Can we do that?
         @base = if (slash_pos = Primitive.find_string_reverse(@feature_no_ext, '/', @feature_no_ext.bytesize))
                   @feature_no_ext[slash_pos + 1..]
                 else
@@ -106,37 +106,38 @@ module Truffle
     #   <PATH>,
     #   <EXTENSION>,
     # ]
-    def self.find_feature_or_file(feature, use_feature_provided = true)
+    # Questions: what is `use_loaded_feature`? Just a `use_cached` flag?
+    def self.find_feature_or_file(feature, use_loaded_feature = true)
       # Get the extension (if there is)
       feature_ext = extension_symbol(feature)
 
       if feature_ext
         case feature_ext
         when :rb
-          if use_feature_provided && feature_provided?(feature)
+          if use_loaded_feature && feature_loaded?(feature)
             return [:feature_loaded, nil, :rb]
           end
           path = find_file(feature)
-          return expanded_path_provided(path, :rb, use_feature_provided) if path
+          return expanded_path_provided(path, :rb, use_loaded_feature) if path
           return [:not_found, nil, nil]
         when :so
-          if use_feature_provided && feature_provided?(feature)
+          if use_loaded_feature && feature_loaded?(feature)
             return [:feature_loaded, nil, :so]
           else
             feature_no_ext = feature[0...-3] # remove ".so"
             path = find_file("#{feature_no_ext}.#{Truffle::Platform::DLEXT}")
-            return expanded_path_provided(path, :so, use_feature_provided) if path
+            return expanded_path_provided(path, :so, use_loaded_feature) if path
           end
         when :dlext
-          if use_feature_provided && feature_provided?(feature)
+          if use_loaded_feature && feature_loaded?(feature)
             return [:feature_loaded, nil, :so]
           else
             path = find_file(feature)
-            return expanded_path_provided(path, :so, use_feature_provided) if path
+            return expanded_path_provided(path, :so, use_loaded_feature) if path
           end
         end
       else
-        found = use_feature_provided && feature_provided?(feature)
+        found = use_loaded_feature && feature_loaded?(feature)
         if found == :rb
           return [:feature_loaded, nil, :rb]
         else
@@ -152,7 +153,7 @@ module Truffle
         if found && ext_normalized != :rb
           [:feature_loaded, nil, found]
         else
-          found_expanded = use_feature_provided && feature_provided?(path)
+          found_expanded = use_loaded_feature && feature_loaded?(path)
           if found_expanded
             [:feature_loaded, nil, ext_normalized]
           else
@@ -164,7 +165,7 @@ module Truffle
           [:feature_loaded, nil, found]
         else
           # NOTE: `expanded` can be true even when it's not
-          found = use_feature_provided && feature_provided?(feature)
+          found = use_loaded_feature && feature_loaded?(feature)
           if found
             found = :so if found == :unknown
             [:feature_loaded, nil, found]
@@ -175,8 +176,8 @@ module Truffle
       end
     end
 
-    def self.expanded_path_provided(path, ext, use_feature_provided)
-      if use_feature_provided && feature_provided?(path)
+    def self.expanded_path_provided(path, ext, use_loaded_feature)
+      if use_loaded_feature && feature_loaded?(path)
         [:feature_loaded, path, ext]
       else
         [:feature_found, path, ext]
@@ -192,7 +193,7 @@ module Truffle
     # Find out what this is doing!
     # Returns the extension IF it's already loaded in LOADED_FEATURES - but only if it's binary or .rb
     # Essentially - this looks up if the feature is already loaded (in LOADED_FEATURES) - and returns the type (rb/bin).
-    def self.feature_provided?(feature)
+    def self.feature_loaded?(feature)
       with_synchronized_features do
         if (
           @feature_provided_cache_load_path_version != $LOAD_PATH.version ||
