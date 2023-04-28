@@ -63,7 +63,12 @@ module Truffle
         @ext = Truffle::FeatureLoader.extension(feature)
         @feature = feature
         @feature_no_ext = @ext ? feature[0...(-@ext.size)] : feature
-        @base = File.basename(@feature_no_ext)
+        # Risking a simpler lookup.
+        @base = if (slash_pos = Primitive.find_string_reverse(@feature_no_ext, '/', @feature_no_ext.bytesize))
+                  @feature_no_ext[slash_pos + 1..]
+                else
+                  @feature_no_ext
+                end
         @index = nil
       end
 
