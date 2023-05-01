@@ -108,79 +108,34 @@ module Truffle
     # ]
     # Questions: what is `use_loaded_feature`? Just a `use_cached` flag?
     def self.find_feature_or_file(feature, use_loaded_feature = true)
-      # Get the extension (if there is)
       feature_ext = extension_symbol(feature)
 
-      if feature_ext
-        case feature_ext
-        when :rb
-          if use_loaded_feature && feature_loaded?(feature)
-            return [:feature_loaded, nil, :rb]
-          end
-          path = find_file(feature)
-          return expanded_path_provided(path, :rb, use_loaded_feature) if path
-          return [:not_found, nil, nil]
-        when :so
-          if use_loaded_feature && feature_loaded?(feature)
-            return [:feature_loaded, nil, :so]
-          else
-            feature_no_ext = feature[0...-3] # remove ".so"
-            path = find_file("#{feature_no_ext}.#{Truffle::Platform::DLEXT}")
-            return expanded_path_provided(path, :so, use_loaded_feature) if path
-          end
-        when :dlext
-          if use_loaded_feature && feature_loaded?(feature)
-            return [:feature_loaded, nil, :so]
-          else
-            path = find_file(feature)
-            return expanded_path_provided(path, :so, use_loaded_feature) if path
+      unless feature_ext
+        if use_loaded_feature
+          if (loaded_feature_ext = feature_loaded?(feature + '.rb'))
+            return [:feature_loaded, nil, loaded_feature_ext]
+          elsif (rb_path = find_file(feature + '.rb')) && (loaded_feature_ext = feature_loaded?(rb_path))
+            return [:feature_loaded, rb_path, loaded_feature_ext]
           end
         end
-      else
-        found = use_loaded_feature && feature_loaded?(feature)
-        if found == :rb
-          return [:feature_loaded, nil, :rb]
-        else
-          # What?
-          found = :so if found == :unknown
+
+        if (rb_path ||= find_file(feature + '.rb'))
+          return [:feature_found, rb_path, feature_ext]
         end
       end
 
-      # path = the complete absolute file path.
-      path = find_file(feature)
-      if path
-        ext_normalized = extension_symbol(path) == :rb ? :rb : :so
-        if found && ext_normalized != :rb
-          [:feature_loaded, nil, found]
-        else
-          found_expanded = use_loaded_feature && feature_loaded?(path)
-          if found_expanded
-            [:feature_loaded, nil, ext_normalized]
-          else
-            [:feature_found, path, ext_normalized]
-          end
-        end
-      else
-        if found
-          [:feature_loaded, nil, found]
-        else
-          # NOTE: `expanded` can be true even when it's not
-          found = use_loaded_feature && feature_loaded?(feature)
-          if found
-            found = :so if found == :unknown
-            [:feature_loaded, nil, found]
-          else
-            [:not_found, nil, nil]
-          end
+      if use_loaded_feature
+        if (loaded_feature_ext = feature_loaded?(feature))
+          return [:feature_loaded, nil, loaded_feature_ext]
+        elsif (path = find_file(feature)) && (loaded_feature_ext = feature_loaded?(path))
+          return [:feature_loaded, path, loaded_feature_ext]
         end
       end
-    end
 
-    def self.expanded_path_provided(path, ext, use_loaded_feature)
-      if use_loaded_feature && feature_loaded?(path)
-        [:feature_loaded, path, ext]
+      if (path ||= find_file(feature))
+        [:feature_found, path, feature_ext]
       else
-        [:feature_found, path, ext]
+        [:not_found, nil, feature_ext]
       end
     end
 
