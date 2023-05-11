@@ -13,7 +13,6 @@ import com.oracle.truffle.api.dsl.ImportStatic;
 import com.oracle.truffle.api.library.CachedLibrary;
 import org.truffleruby.annotations.CoreMethod;
 import org.truffleruby.builtins.CoreMethodArrayArgumentsNode;
-import org.truffleruby.builtins.CoreMethodNode;
 import org.truffleruby.annotations.CoreModule;
 import org.truffleruby.builtins.NonStandard;
 import org.truffleruby.core.array.ArrayGuards;
@@ -73,10 +72,10 @@ public abstract class QueueNodes {
 
     }
 
-    @CoreMethod(names = { "pop", "shift", "deq" }, optional = 1)
+    @CoreMethod(names = { "pop", "shift", "deq" }, optional = 1, rest = true)
     @NodeChild(value = "queue", type = RubyNode.class)
     @NodeChild(value = "nonBlocking", type = RubyBaseNodeWithExecute.class)
-    public abstract static class PopNode extends CoreMethodNode {
+    public abstract static class PopNode extends CoreMethodArrayArgumentsNode {
 
         @CreateCast("nonBlocking")
         protected RubyBaseNodeWithExecute coerceToBoolean(RubyBaseNodeWithExecute nonBlocking) {
@@ -84,28 +83,31 @@ public abstract class QueueNodes {
         }
 
         @Specialization(guards = "!nonBlocking")
-        protected Object popBlocking(RubyQueue self, boolean nonBlocking,
+        protected Object popBlocking(RubyQueue self, boolean nonBlocking, Object[] args,
                 @Exclusive @Cached BranchProfile closedProfile) {
             final UnsizedQueue queue = self.queue;
 
-            final Object value = doPop(queue);
+            return getContext().getThreadManager().runUntilResult(this, () -> {
+                final Object value = queue.poll((long) (3000));
 
-            if (value == UnsizedQueue.CLOSED) {
-                closedProfile.enter();
-                return nil;
-            } else {
-                return value;
-            }
-        }
-
-        @TruffleBoundary
-        private Object doPop(UnsizedQueue queue) {
-            return getContext().getThreadManager().runUntilResult(this, queue::take);
+                if (value == UnsizedQueue.CLOSED) {
+                    closedProfile.enter();
+                    return nil;
+                } else {
+                    return value;
+                }
+            });
         }
 
         @Specialization(guards = "nonBlocking")
-        protected Object popNonBlock(RubyQueue self, boolean nonBlocking,
+        protected Object popNonBlock(RubyQueue self, boolean nonBlocking, Object[] args,
                 @Exclusive @Cached BranchProfile errorProfile) {
+            // TODO: how to check if it is the `timeout` keyword?
+            if (args.length >= 1) {
+                throw new RaiseException(getContext(),
+                        coreExceptions().argumentError("can't set a timeout if non_block is enabled", this));
+            }
+
             final UnsizedQueue queue = self.queue;
 
             final Object value = queue.poll();
