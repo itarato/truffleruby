@@ -68,6 +68,7 @@ import org.truffleruby.core.numeric.RubyBignum;
 import org.truffleruby.core.proc.ProcOperations;
 import org.truffleruby.core.proc.RubyProc;
 import org.truffleruby.core.string.RubyString;
+import org.truffleruby.core.support.RubyIO;
 import org.truffleruby.core.symbol.RubySymbol;
 import org.truffleruby.core.thread.RubyThread;
 import org.truffleruby.extra.ffi.Pointer;
@@ -425,7 +426,7 @@ public abstract class VMPrimitiveNodes {
 
         @TruffleBoundary
         @Specialization
-        protected RubyDynamicObject setClass(RubyDynamicObject object, RubyClass newClass) {
+        protected RubyDynamicObject setClass(RubyIO object, RubyClass newClass) {
             SharedObjects.propagate(getLanguage(), object, newClass);
             synchronized (object) {
                 object.setMetaClass(newClass);

@@ -176,6 +176,22 @@ describe "A method send" do
       m('a', &nil).should == [false]
     end
   end
+
+  context "with a replaced singleton class" do
+    it "looks up singleton methods from the fresh singleton class after an object instance got a new one" do
+      require "socket"
+      proxy = -> (io) { io.foo }
+
+      io = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM)
+      io.define_singleton_method(:foo) { "old" }
+      proxy.call(io).should == "old"
+
+      # `IO#reopen` is an example where an object's singleton class is replaced.
+      io.reopen(Socket.new(Socket::AF_INET, Socket::SOCK_STREAM))
+      io.define_singleton_method(:foo) { "new" }
+      proxy.call(io).should == "new"
+    end
+  end
 end
 
 describe "An element assignment method send" do

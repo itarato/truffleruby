@@ -6,6 +6,7 @@ New features:
 Bug fixes:
 
 * Fix `Dir.glob` returning blank string entry with leading `**/` in glob and `base:` argument (@rwstauner).
+* Fixing singleton class lookup after an object's singleton class has been replaced (@itarato).
 
 Compatibility:
 
