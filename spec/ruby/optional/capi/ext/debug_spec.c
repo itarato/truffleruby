@@ -69,6 +69,16 @@ VALUE debug_spec_rb_debug_inspector_frame_iseq_get(VALUE self, VALUE index) {
   return rb_debug_inspector_open(rb_debug_inspector_frame_iseq_get_callback, (void *)index);
 }
 
+VALUE rb_debug_inspector_frame_depth(const rb_debug_inspector_t *dc, long index) {
+    VALUE frame = frame_get(dc, index);
+    return rb_ary_entry(frame, CALLER_BINDING_DEPTH);
+}
+
+VALUE rb_debug_inspector_current_depth(void) {
+    rb_execution_context_t *ec = GET_EC();
+    return INT2FIX(frame_depth(ec, ec->cfp));
+}
+
 static VALUE rb_debug_inspector_backtrace_locations_func(const rb_debug_inspector_t *dc, void *ptr) {
   return rb_debug_inspector_backtrace_locations(dc);
 }

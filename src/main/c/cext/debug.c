@@ -64,3 +64,18 @@ VALUE rb_debug_inspector_frame_self_get(const rb_debug_inspector_t *dc, long ind
   VALUE frame = frame_get(dc, index);
   return rb_ary_entry(frame, CALLER_BINDING_SELF);
 }
+
+VALUE rb_debug_inspector_frame_depth(const rb_debug_inspector_t *dc, long index) {
+    VALUE frame = frame_get(dc, index);
+    return rb_ary_entry(frame, CALLER_BINDING_DEPTH);
+}
+
+static int frame_depth(const rb_execution_context_t *ec, const rb_control_frame_t *cfp) {
+    VM_ASSERT(RUBY_VM_END_CONTROL_FRAME(ec) >= cfp);
+    return (int)(RUBY_VM_END_CONTROL_FRAME(ec) - cfp);
+}
+
+VALUE rb_debug_inspector_current_depth(void) {
+    rb_execution_context_t *ec = GET_EC();
+    return INT2FIX(frame_depth(ec, ec->cfp));
+}
