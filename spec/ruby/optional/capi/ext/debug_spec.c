@@ -69,14 +69,12 @@ VALUE debug_spec_rb_debug_inspector_frame_iseq_get(VALUE self, VALUE index) {
   return rb_debug_inspector_open(rb_debug_inspector_frame_iseq_get_callback, (void *)index);
 }
 
-VALUE rb_debug_inspector_frame_depth(const rb_debug_inspector_t *dc, long index) {
-    VALUE frame = frame_get(dc, index);
-    return rb_ary_entry(frame, CALLER_BINDING_DEPTH);
+VALUE debug_spec_rb_debug_inspector_frame_depth(VALUE self, VALUE index) {
+    return rb_debug_inspector_open(rb_debug_inspector_frame_depth, (void *)index);
 }
 
-VALUE rb_debug_inspector_current_depth(void) {
-    rb_execution_context_t *ec = GET_EC();
-    return INT2FIX(frame_depth(ec, ec->cfp));
+VALUE debug_spec_rb_debug_inspector_current_depth(VALUE self) {
+    return rb_debug_inspector_current_depth();
 }
 
 static VALUE rb_debug_inspector_backtrace_locations_func(const rb_debug_inspector_t *dc, void *ptr) {
@@ -96,6 +94,8 @@ void Init_debug_spec(void) {
   rb_define_method(cls, "rb_debug_inspector_frame_iseq_get", debug_spec_rb_debug_inspector_frame_iseq_get, 1);
   rb_define_method(cls, "rb_debug_inspector_backtrace_locations", debug_spec_rb_debug_inspector_backtrace_locations, 0);
   rb_define_method(cls, "debug_spec_callback_data", debug_spec_callback_data, 0);
+  rb_define_method(cls, "rb_debug_inspector_frame_depth", debug_spec_rb_debug_inspector_frame_depth, 1);
+  rb_define_method(cls, "rb_debug_inspector_current_depth", debug_spec_rb_debug_inspector_current_depth, 0);
 }
 
 #ifdef __cplusplus
