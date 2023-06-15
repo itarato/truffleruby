@@ -43,7 +43,10 @@ static VALUE frame_get(const rb_debug_inspector_t *dc, long index) {
 enum {
   CALLER_BINDING_SELF,
   CALLER_BINDING_CLASS,
-  CALLER_BINDING_BINDING
+  CALLER_BINDING_BINDING,
+  __CALLER_BINDING_ISEQ, // Unused.
+  __CALLER_BINDING_CFP, // Unused.
+  CALLER_BINDING_DEPTH
 };
 
 VALUE rb_debug_inspector_frame_binding_get(const rb_debug_inspector_t *dc, long index) {

@@ -1939,11 +1939,11 @@ module Truffle::CExt
   end
 
   def rb_debug_inspector_open_contexts
-    Truffle::Debug.get_frame_bindings.map do |binding|
+    Truffle::Debug.get_frame_bindings.map.with_index do |binding, idx|
       if binding
-        [binding.receiver, Primitive.class(binding.receiver), binding]
+        [binding.receiver, Primitive.class(binding.receiver), binding, nil, nil, idx]
       else
-        [nil, nil, nil]
+        [nil, nil, nil, nil, nil, idx]
       end
     end.freeze
   end
